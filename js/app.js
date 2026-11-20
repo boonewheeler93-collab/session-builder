@@ -126,7 +126,7 @@ function viewHome() {
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = ws.filter((w) => (w.sun || w.sat) >= today);
   const past = ws.filter((w) => (w.sun || w.sat) < today).reverse().slice(0, 4);
-  const machines = Object.entriesmachinesNow();
+  const machines = Object.entries(machinesNow());
   const sync = store.get("sync") || {};
   const card = (w, i) => {
     const B = buildWeekend(w, ctx());
@@ -592,7 +592,7 @@ function viewBuild(wid) {
   const w = weekends()[wid];
   if (!w) return viewHome();
   const B = buildWeekend(w, ctx());
-  const machines = Object.entriesmachinesNow().filter(([, m]) => m.kind !== "booth");
+  const machines = Object.entries(machinesNow()).filter(([, m]) => m.kind !== "booth");
   const mine = machines.find(([, m]) => m.owner && m.owner.toLowerCase() === (me() || "").toLowerCase());
   const pick = ui.buildMachine && machines.some(([id]) => id === ui.buildMachine) ? ui.buildMachine : (mine || machines.find(([, m]) => m.online) || machines[0] || [])[0];
   const job = w.build?.jobId ? (store.get("jobs") || {})[w.build.jobId] : null;
@@ -611,7 +611,10 @@ function viewBuild(wid) {
         return `<div class="stp"><span class="ic ${st}">${st === "done" ? "✓" : st === "fail" ? "!" : ""}</span><span><span style="font-size:15px;${st === "todo" ? "color:var(--ink-3)" : "font-weight:500"}">${h(label)}</span>${job.detail && i === doneN ? `<br><span class="small muted">${h(job.detail)}</span>` : ""}</span></div>`;
       }).join("")}</div>
       ${job.status === "queued" ? `<p class="small muted" style="margin:0">Waiting for the helper to pick it up. Pro Tools must be open on that computer.</p>` : ""}
-      ${job.status === "done" ? `<p class="small" style="margin:0">Saved in TRACKS / ${h(name)}. ${B.handWork.length ? `Next: ${B.handWork.length} thing${B.handWork.length > 1 ? "s" : ""} to do by hand, then Finish.` : "Nothing to do by hand — ready to Finish."}</p>` : ""}
+      ${job.status === "done" ? `<p class="small" style="margin:0">${h(job.detail || "Saved in TRACKS / " + name + ".")}${job.result?.test ? " <b>Test build</b> (test mode is on)." : ""}</p>
+        ${(job.result?.manual || []).length || B.handWork.length ? `<details class="more" open><summary>To do by hand in Pro Tools (${(job.result?.manual || []).length + B.edits.length})</summary><div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+          ${[...(job.result?.manual || []), ...B.edits.map((e) => e.title + " · arrangement: " + e.text)].map((t) => `<span class="check"><i></i>${h(t)}</span>`).join("")}</div></details>` : "<p class=\"small\" style=\"margin:0\">Nothing to do by hand — ready to Finish.</p>"}` : ""}
+      ${job.status === "failed" ? `<div class="flag error">${h(job.detail || "The build failed.")}</div>` : ""}
     </div>`;
   }
   return `<div class="wrap" style="max-width:640px">
@@ -640,7 +643,7 @@ async function startBuild(wid, machineId) {
   const plan = {
     sessionName: sessionName(w),
     parts: B.resolved.map((r) => clean({
-      id: r.id, type: r.type, title: r.title, libPath: r.song?.path, version: r.version?.name,
+      id: r.id, type: r.type, title: r.title, libPath: r.song?.path, version: r.version?.name, file: r.file,
       start: +r.t.start.toFixed(4), countIn: +r.t.countIn.toFixed(4), end: +r.t.end.toFixed(4), bpm: r.bpm, meter: r.meter.join("/"),
       shift: r.type === "song" && !r.pnt ? r.shift : 0, pnt: r.pnt || undefined,
       pad: r.type === "moment" && r.padOn ? { key: r.padKey, file: r.padFile, start: +r.t.padStart.toFixed(3), end: +r.t.padEnd.toFixed(3) } : undefined,
