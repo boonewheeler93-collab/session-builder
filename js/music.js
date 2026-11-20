@@ -151,9 +151,15 @@ export function findWalkin(lib, name) {
 }
 
 /** Pick a version: title hints first, then the key folder nearest the plan key. */
-export function pickVersion(song, { hints = [], planKey } = {}) {
+export function pickVersion(song, { hints = [], planKey, arrangement } = {}) {
   const vs = song?.versions || [];
   if (!vs.length) return null;
+  // Planning Center arrangement name vs version folder: "Short To 5:30m" ~ "I Know A Name (Short To 530m)"
+  const compact = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (arrangement && compact(arrangement).length > 3) {
+    const v = vs.find((v) => compact(v.name).includes(compact(arrangement)));
+    if (v) return v;
+  }
   const want = hints.join(" ");
   if (/short/.test(want)) { const v = vs.find((v) => /short/i.test(v.name)); if (v) return v; }
   if (/long/.test(want)) { const v = vs.find((v) => /long/i.test(v.name)); if (v) return v; }
@@ -175,7 +181,7 @@ export function pickVersion(song, { hints = [], planKey } = {}) {
  * Stem key for a song/version, with where it came from (order of trust, CLAUDE.md §2).
  * meta = saved per-song data { stemKey, stemKeyBy } keyed by song path + version.
  */
-export function stemKeyFor(song, version, meta) {
+export function stemKeyFor(song, version, meta, chartKey) {
   if (meta?.stemKey) return { key: meta.stemKey, source: "Confirmed", by: meta.stemKeyBy, trust: 1 };
   if (version?.kind === "key") return { key: version.key, source: "Key folder", trust: 2 };
   if (version?.keyTag) return { key: version.keyTag, source: "Filename tag", trust: 2 };
@@ -184,6 +190,7 @@ export function stemKeyFor(song, version, meta) {
   if (song?.chartKeys?.length === 1) return { key: song.chartKeys[0], source: "Chart filename", trust: 3 };
   if (version?.keyHint || song?.keyHint) return { key: version?.keyHint || song.keyHint, source: "Folder name", trust: 4 };
   if (known?.record) return { key: known.record, source: "Record key (stems may differ)", trust: 4, guess: true };
+  if (chartKey) return { key: keyName(chartKey), source: "Planning Center chart key (stems may differ)", trust: 4, guess: true };
   return { key: null, source: "Unknown — confirm or run detection", trust: 9 };
 }
 

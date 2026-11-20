@@ -6,10 +6,15 @@
 //     lengthSec, countInBars, nudgeBars, pad:{on,key} }
 // Output: { parts, tempoMap, markers, bounce, end, warnings }
 
-/** Seconds per bar. Pro Tools tempo is in quarter notes, so 6/8 = 3 quarters. */
+/**
+ * Seconds per bar. Simple meters count the tempo in beats of the bottom note (4/4 = 4 quarters).
+ * Compound meters (6/8, 9/8, 12/8) count it in dotted quarters, as Planning Center and the click do:
+ * 6/8 at 86 = 2 beats per bar. Checked against the 11/21–22 session, whose bar lines only line up this way.
+ */
 export function barSec(bpm, meter = [4, 4]) {
   const [n, d] = meter;
-  return (n * (4 / d) * 60) / (bpm || 120);
+  const beats = d === 8 && n % 3 === 0 ? n / 3 : n * (4 / d);
+  return (beats * 60) / (bpm || 120);
 }
 
 /** Snap t to the nearest bar line of a grid starting at origin. */

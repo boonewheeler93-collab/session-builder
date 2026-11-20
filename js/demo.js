@@ -5,7 +5,7 @@ const now = Date.now();
 const H = 3600e3;
 
 export const DEMO = {
-  seedVersion: 5,
+  seedVersion: 7,
   settings: {},
   machines: {
     boone: { name: "Boone's MacBook", owner: "Boone", online: true, proTools: true, lastSeen: now - 60e3, kind: "laptop" },
@@ -35,12 +35,12 @@ export const DEMO = {
         },
         {
           id: "s2", type: "song", title: "I Know A Name", pcoTitle: "I Know A Name", planKey: "D", planLengthSec: 282,
-          notes: ["+ Boone"], version: "I Know A Name (Short To 530m)", nudgeBars: 4, lengthSec: 279,
+          notes: ["+ Boone"], version: "I Know A Name (Short To 530m)", meter: [6, 8], nudgeBars: 2, lengthSec: 279,
         },
-        { id: "pm", type: "moment", title: "Pastoral Moment", notes: ["+ Ana"], lengthSec: 30, pad: { on: true }, nudgeBars: 1, notInPlan: true },
+        { id: "pm", type: "moment", title: "Pastoral Moment", notes: ["+ Ana"], lengthSec: 30, pad: { on: true }, nudgeBars: 2, notInPlan: true },
         {
           id: "s3", type: "song", title: "More Than Able", pcoTitle: "More Than Able", planKey: "D", planLengthSec: 456,
-          notes: ["+ Boone / Ana"], meter: [6, 8], nudgeBars: 6, lengthSec: 454,
+          notes: ["+ Boone / Ana"], meter: [6, 8], nudgeBars: 8, lengthSec: 454,
         },
       ],
       build: { status: "built", machine: "ana", by: "Ana", at: now - 60 * H },

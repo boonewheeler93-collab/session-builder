@@ -173,7 +173,7 @@ function viewWeekend(wid) {
     <div class="top">
       <div class="row" style="gap:12px">
         <a class="iconbtn" href="#/" aria-label="Back to weekends">${icon.back}</a>
-        <div><span class="label">${h(w.serviceType || "Northland | Weekend")} · ${w.source === "planner" ? "planned here" : "from Planning Center"}</span>
+        <div><span class="label">${h(w.serviceType || "Northland | Weekend")}${w.planTitle ? " · " + h(w.planTitle) : ""} · ${w.planUrl ? `<a href="${h(w.planUrl)}" target="_blank" rel="noopener">open in Planning Center</a>` : w.source === "planner" ? "planned here" : "from Planning Center"}</span>
         <h1 class="num">${h(weekendTitle(w))} <span class="muted" style="font-size:15px;font-weight:500">${h(sessionName(w))}</span></h1></div>
       </div>
       <div class="wrapflex">
@@ -190,6 +190,7 @@ function viewWeekend(wid) {
     </div>
     ${modeBanner()}
     ${w.build ? buildLine({ ...w, id: wid }) : ""}
+    ${w.changedSinceSend ? `<div class="banner local">The plan changed in Planning Center after it was sent from here. Planning Center wins: the list below shows the plan as it is now.</div>` : ""}
     ${tlOpen ? timelineHtml(wid, B, sel) : ""}
     <div class="panes">
       <div class="glass list" role="list">
@@ -387,6 +388,13 @@ function timelineHtml(wid, B, sel) {
   </div></div></div>`;
 }
 
+/** Last time a song / walk-in was in a Northland Weekend plan (from the sync job, same key rule). */
+const fkey = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/[.#$[\]/]/g, "") || "_";
+function lastUsedOf(tab, title) {
+  const lu = store.get("sync")?.lastUsed;
+  return lu ? (tab === "walkin" ? lu.walkins : lu.songs)?.[fkey(title)] : null;
+}
+
 /** Audio files the helper found in MUSIC / BEGINS NOW, countdown-ish ones first for the countdown. */
 function audioChoices(type) {
   const list = (lib?.music || []).filter((m) => /\.(wav|aiff?)$/i.test(m.path));
@@ -451,7 +459,8 @@ function bankList(wid, forId, tab, sec, secKey) {
       `${stems} stems`, `≈${fmt(len)}`,
     ].filter(Boolean).join(" · ");
     const loose = clicks.find((c) => !c.bpmExact);
-    const flag = !clicks.length ? "No click stem" : inexact ? (loose.bpm ? `Click says "${loose.file.match(/\(([^)]*\d[^)]*)\)/)?.[1] || "≈" + loose.bpm}" — confirm BPM` : "Click has no BPM in its name") : s.folderNotes ? s.folderNotes.join(", ") : s.collection || "";
+    const lu = lastUsedOf(tab, s.title);
+    const flag = lu ? `Last used at Northland ${new Date(lu + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` + (!clicks.length ? " · no click stem" : "") : !clicks.length ? "No click stem" : inexact ? (loose.bpm ? `Click says "${loose.file.match(/\(([^)]*\d[^)]*)\)/)?.[1] || "≈" + loose.bpm}" — confirm BPM` : "Click has no BPM in its name") : s.folderNotes ? s.folderNotes.join(", ") : s.collection || "";
     const on = inSet.has(s.path);
     const label = forId ? "Use" : on ? "In set" : "Add";
     return `<div class="glass song"><div style="min-width:0"><div class="t">${h(s.title)}</div><div class="m">${h(meta)}</div>

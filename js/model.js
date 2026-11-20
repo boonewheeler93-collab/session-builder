@@ -28,7 +28,7 @@ export function autoMatch(lib, item) {
     const s = findWorshipSong(lib, item.pcoTitle || item.title);
     if (!s) return item;
     const { hints } = splitTitleHints(item.pcoTitle || item.title);
-    const v = pickVersion(s, { hints, planKey: item.planKey });
+    const v = pickVersion(s, { hints, planKey: item.planKey, arrangement: item.pcoArrangement?.name });
     return { ...item, libPath: s.path, version: item.version || v?.name, matchedBy: "auto" };
   }
   return item;
@@ -85,18 +85,28 @@ export function resolveItem(item, ctx, index, all) {
     Object.assign(r, { bpm: item.bpm || 120, meter: item.meter || [4, 4], lengthSec: item.lengthSec || item.planLengthSec || 240, stub: true });
     return r;
   }
-  const version = song.versions.find((v) => v.name === item.version) || pickVersion(song, { planKey: item.planKey, hints: splitTitleHints(item.pcoTitle || "").hints });
+  const version = song.versions.find((v) => v.name === item.version) || pickVersion(song, { planKey: item.planKey, hints: splitTitleHints(item.pcoTitle || "").hints, arrangement: item.pcoArrangement?.name });
   r.version = version;
   const m = meta[metaKey(song.path, version?.name)] || {};
   r.meta = m;
   const click = version?.click;
-  r.bpm = item.bpm ?? m.bpm ?? click?.bpm ?? 120;
-  r.bpmSource = item.bpm != null ? "Set for this weekend" : m.bpm != null ? `Confirmed${m.bpmBy ? " by " + m.bpmBy : ""}` : click?.bpm ? (click.bpmExact ? `From ${click.file.replace(/\.wav$/i, "")}` : click.bpm ? `Click says "${click.file.match(/\(([^)]*\d[^)]*)\)/)?.[1] || "≈" + click.bpm}"` : "Click has no BPM in its name") : "No click — enter BPM";
-  r.bpmNeedsConfirm = item.bpm == null && m.bpm == null && (!click || !click.bpmExact);
+  const arr = item.pcoArrangement || {};
+  const exactClick = click?.bpmExact ? click.bpm : null;
+  // Trust order: set this weekend > confirmed for the song > exact click name > Planning Center arrangement > rough click name
+  r.bpm = item.bpm ?? m.bpm ?? exactClick ?? arr.bpm ?? click?.bpm ?? 120;
+  r.bpmSource = item.bpm != null ? "Set for this weekend" : m.bpm != null ? `Confirmed${m.bpmBy ? " by " + m.bpmBy : ""}`
+    : exactClick ? `From ${click.file.replace(/\.wav$/i, "")}` : arr.bpm ? `Planning Center arrangement “${arr.name || ""}”`
+    : click?.bpm ? `Click says "${click.file.match(/\(([^)]*\d[^)]*)\)/)?.[1] || "≈" + click.bpm}"` : click ? "Click has no BPM in its name" : "No click — enter BPM";
+  r.bpmNeedsConfirm = item.bpm == null && m.bpm == null && !exactClick && !arr.bpm;
   if (r.bpmNeedsConfirm) r.flags.push({ level: "warn", text: click ? `BPM inexact (${r.bpmSource}) — enter the exact BPM once` : "No click stem — enter BPM" });
-  r.meter = item.meter || m.meter || [4, 4];
+  if (exactClick && arr.bpm && Math.abs(arr.bpm - exactClick) > 0.5 && item.bpm == null && m.bpm == null) {
+    const half = Math.abs(arr.bpm - exactClick * 2) < 1 || Math.abs(arr.bpm * 2 - exactClick) < 1;
+    r.flags.push({ level: half ? "info" : "warn", text: `Planning Center says ${arr.bpm} BPM, the click says ${exactClick}${half ? " (half/double time) — using the click" : " — using the click; confirm which is right"}` });
+  }
+  const arrMeter = /^\d+\/\d+$/.test(arr.meter || "") ? arr.meter.split("/").map(Number) : null;
+  r.meter = item.meter || m.meter || arrMeter || [4, 4];
+  r.meterSource = item.meter ? "Set for this weekend" : m.meter ? "Confirmed" : arrMeter ? "Planning Center arrangement" : "Default";
   r.countInBars = item.countInBars ?? m.countInBars;
-  if (r.meter[1] === 8 && r.countInBars == null && item.countInSec == null) r.flags.push({ level: "info", text: `${r.meter.join("/")}: count-in assumes quarter-note tempo — check it against the click` });
   const full = version ? version.lengthSec : 0;
   r.fileLengthSec = full;
   r.lengthSec = item.lengthSec ?? full;
@@ -112,7 +122,7 @@ export function resolveItem(item, ctx, index, all) {
   // keys (songs only; walk-ins play in their own key)
   if (item.type === "song") {
     r.planKey = keyName(item.planKey);
-    r.stemKey = stemKeyFor(song, version, m);
+    r.stemKey = stemKeyFor(song, version, m, arr.chord_chart_key);
     r.shift = r.planKey && r.stemKey.key ? shiftBetween(r.stemKey.key, r.planKey) : null;
     if (!r.planKey) r.flags.push({ level: "warn", text: "No plan key" });
     if (!r.stemKey.key) r.flags.push({ level: "warn", text: "Stem key unknown — confirm it" });
