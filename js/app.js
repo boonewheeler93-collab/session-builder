@@ -405,7 +405,7 @@ function viewBank(wid) {
   if (q.get("tab") && !ui._bankTabSet) { ui.bankTab = q.get("tab"); ui._bankTabSet = true; }
   const w = wid ? weekends()[wid] : null;
   const tab = ui.bankTab;
-  const secs = tab === "walkin" ? ["All", "At The Movies", "Christmas"] : ["All", "Songs For Sometimes", "Christmas 2026", "SWITCH", "Stem Archive", "Archive"];
+  const secs = tab === "walkin" ? ["All", "At The Movies", "Christmas"] : ["All", "Songs For Sometimes", "Christmas 2026", "SWITCH", "Archive"];
   const secKey = { All: null, "At The Movies": "At The Movies", Christmas: "Christmas" };
   const sec = secs.includes(ui.bankSec) ? ui.bankSec : "All";
   const back = wid ? `#/w/${wid}` : "#/";

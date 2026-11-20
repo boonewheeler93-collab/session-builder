@@ -126,7 +126,6 @@ export function resolveItem(item, ctx, index, all) {
   // Arrangement edits from Planning Center notes (§2 song sections will apply these automatically and
   // Boone reviews them; until that feature exists they are done by hand after the build).
   for (const n of item.notes || []) if (isFormNote(n)) r.edits.push(n.replace(/^\s*\*\s*/, ""));
-  if (song.collection === "Stem Archive") r.flags.push({ level: "info", text: "Stem Archive — older file names" });
   return r;
 }
 

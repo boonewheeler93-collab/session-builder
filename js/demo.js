@@ -1,15 +1,15 @@
 // Test data used until the sync job writes real Planning Center plans to Firebase.
-// Nov 21–22 mirrors the finished plan and the intern's 11/21–22 session; the
+// Nov 21–22 mirrors the finished plan and Ana's 11/21–22 session; the
 // nudges reproduce that session's placements on the new bar-line grid.
 const now = Date.now();
 const H = 3600e3;
 
 export const DEMO = {
-  seedVersion: 4,
+  seedVersion: 5,
   settings: {},
   machines: {
     boone: { name: "Boone's MacBook", owner: "Boone", online: true, proTools: true, lastSeen: now - 60e3, kind: "laptop" },
-    intern: { name: "Intern's laptop", owner: "Intern", online: false, proTools: false, lastSeen: now - 50 * H, kind: "laptop" },
+    ana: { name: "Ana's laptop", owner: "Ana", online: false, proTools: false, lastSeen: now - 50 * H, kind: "laptop" },
     booth: { name: "Booth Mac mini", owner: "", online: true, proTools: false, lastSeen: now - 5 * 60e3, kind: "booth" },
   },
   sync: { lastRun: now - 12 * 60e3, ok: true },
@@ -43,7 +43,7 @@ export const DEMO = {
           notes: ["+ Boone / Ana"], meter: [6, 8], nudgeBars: 6, lengthSec: 454,
         },
       ],
-      build: { status: "built", machine: "intern", by: "Intern", at: now - 60 * H },
+      build: { status: "built", machine: "ana", by: "Ana", at: now - 60 * H },
     },
     "pco-nov28": {
       sat: "2026-11-28", sun: "2026-11-29", serviceType: "Northland | Weekend", pcoPlanId: "demo-1128",
@@ -63,7 +63,7 @@ export const DEMO = {
         { id: "bn", type: "beginsNow", title: "Begins Now" },
         { id: "s1", type: "song", title: "Standing In Victory", pcoTitle: "Standing In Victory", planKey: "Bb", notes: [] },
       ],
-      build: { status: "uploaded", machine: "intern", by: "Intern", at: now - 7 * 24 * H },
+      build: { status: "uploaded", machine: "ana", by: "Ana", at: now - 7 * 24 * H },
     },
   },
 };
