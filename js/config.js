@@ -19,8 +19,12 @@ export const ROOT = "sessionBuilder";
 export const DEFAULT_SETTINGS = {
   countdownBpm: 120,
   beginsNowBpm: 150,
-  countdownSec: 311,      // 2024 Countdown Audio (5min) V2.wav, 0:00–5:11 in the 11/21–22 session
-  beginsNowSec: 36,       // LC_23_Begins Now.wav, 8:17–8:53 in the 11/21–22 session
+  // Default fixed audio (paths under the Dropbox "Boone Wheeler" folder). Boone's rule: every new
+  // session uses these unless a different file is chosen in Settings or for one weekend.
+  countdownFile: "_NKC PROTOOLS COMPUTER/MUSIC/2024 Countdown Audio (5min) V2.wav",
+  beginsNowFile: "_NKC PROTOOLS COMPUTER/MUSIC/BEGINS NOW.wav",
+  countdownSec: 311.965,  // measured from the file header (48 kHz / 24-bit stereo)
+  beginsNowSec: 37.119,   // measured from the file header (48 kHz / 16-bit stereo)
   countInBars: 2,
   gapSec: 0,              // downbeat lands this long after the previous audio ends
   padFadeInSec: 5,        // pad starts fading in this long before the previous song ends

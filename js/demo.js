@@ -5,7 +5,7 @@ const now = Date.now();
 const H = 3600e3;
 
 export const DEMO = {
-  seedVersion: 3,
+  seedVersion: 4,
   settings: {},
   machines: {
     boone: { name: "Boone's MacBook", owner: "Boone", online: true, proTools: true, lastSeen: now - 60e3, kind: "laptop" },
@@ -31,7 +31,7 @@ export const DEMO = {
         { id: "bn", type: "beginsNow", title: "Begins Now", planLengthSec: 29, nudgeBars: -3 },
         {
           id: "s1", type: "song", title: "The Joy", pcoTitle: "The Joy", planKey: "G", planLengthSec: 291,
-          notes: ["+ Tara", "*WELCOME"], nudgeBars: -2, lengthSec: 290, transpose: "auto",
+          notes: ["+ Tara", "*WELCOME"], nudgeBars: -3, lengthSec: 290, transpose: "auto",
         },
         {
           id: "s2", type: "song", title: "I Know A Name", pcoTitle: "I Know A Name", planKey: "D", planLengthSec: 282,

@@ -306,7 +306,13 @@ function detailHtml(wid, w, B, r) {
     ${transition}
     <button class="btn small" data-act="remove" data-w="${h(wid)}" data-id="${h(r.id)}" style="align-self:flex-start">Remove moment</button>`;
   } else {
-    body += `<p class="small muted" style="margin:0">${h(r.file)} on the VIDEO track. Tempo ${r.bpm} BPM (Settings).</p>${transition}`;
+    const opts = audioChoices(r.type);
+    body += `<label class="field"><span>Audio · ${h(r.fileSource)} · ${fmt(r.lengthSec, 1)}${r.lengthApprox ? " ≈" : ""}</span>
+      <select class="input" data-ch="fixedFile" data-w="${h(wid)}" data-id="${h(r.id)}">
+        <option value="">Default — ${h((r.type === "countdown" ? settings().countdownFile : settings().beginsNowFile).split("/").pop())}</option>
+        ${opts.filter((m) => m.path !== (r.type === "countdown" ? settings().countdownFile : settings().beginsNowFile)).map((m) => `<option value="${h(m.path)}" ${it.file === m.path ? "selected" : ""}>${h(m.path.split("/").slice(-2).join(" / "))}${m.secs ? " · " + fmt(m.secs) : ""}</option>`).join("")}
+      </select></label>
+      <p class="small muted" style="margin:0">Goes on the VIDEO track at the top of the session. Tempo ${r.bpm} BPM (Settings). To change the default for every new session, use Settings.</p>${transition}`;
   }
 
   const notes = (it.notes || []).length ? `<div class="glass card" style="gap:8px"><span class="label">From Planning Center</span>
@@ -373,6 +379,13 @@ function timelineHtml(wid, B, sel) {
     ${b ? `<div class="bounce"><div class="ln" style="left:${pct(b.start)};width:${pct(b.end - b.start)}"></div><span class="num" style="left:${pct(b.start)}">WORSHIP bounce ${fmt(b.start)} → ${fmt(b.end)}</span></div>` : ""}
     <div class="legend"><span>Striped = 2-bar count-in</span><span>Songs alternate rows so overlaps show</span><span>Dashed = moment length</span></div>
   </div></div></div>`;
+}
+
+/** Audio files the helper found in MUSIC / BEGINS NOW, countdown-ish ones first for the countdown. */
+function audioChoices(type) {
+  const list = (lib?.music || []).filter((m) => /\.(wav|aiff?)$/i.test(m.path));
+  const re = type === "countdown" ? /countdown/i : /begins now/i;
+  return [...list.filter((m) => re.test(m.path)), ...list.filter((m) => !re.test(m.path))];
 }
 
 // ----- song bank -----
@@ -582,6 +595,16 @@ function viewSettings() {
         : `<span class="small muted">Same shared sync password as the start-times app.${fbState.error ? ` Last error: ${h(fbState.error)}` : ""}</span>
         <form class="row" data-form="signin" style="flex-wrap:wrap"><label class="sr" for="pw">Sync password</label><input id="pw" class="input grow" type="password" autocomplete="current-password" placeholder="Sync password" style="max-width:280px"><button class="btn primary" type="submit">Sign in</button></form>`}
     </div>
+    <div class="glass card"><span class="label">Fixed audio for every new session</span>
+      ${["countdown", "beginsNow"].map((t) => {
+        const k = t === "countdown" ? "countdownFile" : "beginsNowFile";
+        const opts = audioChoices(t);
+        const has = opts.some((m) => m.path === S[k]);
+        return `<label class="field"><span>${t === "countdown" ? "Countdown" : "Begins Now"}</span><select class="input" data-setfile="${k}">
+          ${has ? "" : `<option selected value="${h(S[k])}">${h(S[k].split("/").slice(-2).join(" / "))}${lib ? " (not found)" : ""}</option>`}
+          ${opts.map((m) => `<option value="${h(m.path)}" ${m.path === S[k] ? "selected" : ""}>${h(m.path.split("/").slice(-2).join(" / "))}${m.secs ? " · " + fmt(m.secs) : ""}</option>`).join("")}</select></label>`;
+      }).join("")}
+      <span class="small muted">Lists audio in _NKC PROTOOLS COMPUTER/MUSIC (and the older _DRB SESSION NEEDS/BEGINS NOW). Any weekend can pick a different file on its Countdown or Begins Now item.</span></div>
     <div class="glass card"><span class="label">Timing defaults</span>
       <div class="fields">${num("countdownBpm", "Countdown BPM")}${num("beginsNowBpm", "Begins Now BPM")}${num("countdownSec", "Countdown length (s)")}${num("beginsNowSec", "Begins Now length (s)")}${num("countInBars", "Count-in bars")}${num("gapSec", "Gap before downbeat (s)")}${num("padFadeInSec", "Pad fade-in lead (s)")}${num("padFadeOutSec", "Pad fade-out (s)")}${num("momentSec", "Default moment (s)")}</div>
       <span class="small muted">SWITCH may need different values later.</span></div>
@@ -647,6 +670,15 @@ document.addEventListener("click", async (e) => {
 document.addEventListener("change", async (e) => {
   const el = e.target;
   const { ch, w: wid, id } = el.dataset;
+  if (el.dataset.setfile) {
+    const k = el.dataset.setfile;
+    const m = (lib?.music || []).find((x) => x.path === el.value);
+    const patch = { [k]: el.value };
+    if (m?.exact) patch[k === "countdownFile" ? "countdownSec" : "beginsNowSec"] = m.secs;
+    await store.update("settings", patch);
+    toast("Default saved for new sessions");
+    return;
+  }
   if (el.dataset.set) {
     const n = parseFloat(el.value);
     if (!isNaN(n)) await store.update("settings", { [el.dataset.set]: n });
@@ -692,7 +724,8 @@ document.addEventListener("change", async (e) => {
   } else if (ch === "momentLen") {
     const n = parseFloat(el.value);
     if (!isNaN(n) && n > 0) await patchItem(wid, id, { lengthSec: n });
-  } else if (ch === "padOn") await patchItem(wid, id, { pad: { ...(it.pad || {}), on: el.checked } });
+  } else if (ch === "fixedFile") await patchItem(wid, id, { file: el.value || undefined });
+  else if (ch === "padOn") await patchItem(wid, id, { pad: { ...(it.pad || {}), on: el.checked } });
   else if (ch === "padKey") await patchItem(wid, id, { pad: clean({ ...(it.pad || {}), key: el.value || undefined }) });
 });
 

@@ -42,12 +42,19 @@ export function resolveItem(item, ctx, index, all) {
   const { lib, meta, settings } = ctx;
   const r = { item, flags: [], steps: [], id: item.id, type: item.type, title: item.title };
   const S = settings;
-  if (item.type === "countdown") {
-    Object.assign(r, { bpm: S.countdownBpm, meter: [4, 4], lengthSec: S.countdownSec, file: "2024 Countdown Audio (5min) V2.wav", lane: "video" });
-    return r;
-  }
-  if (item.type === "beginsNow") {
-    Object.assign(r, { bpm: S.beginsNowBpm, meter: [4, 4], lengthSec: S.beginsNowSec, file: "LC_23_Begins Now.wav", lane: "video" });
+  if (item.type === "countdown" || item.type === "beginsNow") {
+    const cd = item.type === "countdown";
+    const file = item.file || (cd ? S.countdownFile : S.beginsNowFile);
+    const entry = (lib?.music || []).find((m) => m.path === file);
+    const fallback = cd ? S.countdownSec : S.beginsNowSec;
+    const isDefault = !item.file || item.file === (cd ? S.countdownFile : S.beginsNowFile);
+    Object.assign(r, {
+      bpm: cd ? S.countdownBpm : S.beginsNowBpm, meter: [4, 4], lane: "video",
+      file, fileName: file.split("/").pop(), fileSource: isDefault ? "Default (Settings)" : "Chosen for this weekend",
+      lengthSec: item.lengthSec ?? (entry?.exact ? entry.secs : isDefault ? fallback : entry?.secs ?? fallback),
+      lengthApprox: !(entry?.exact) && !(isDefault && cd),
+    });
+    if (lib?.music && !entry) r.flags.push({ level: "warn", text: `${r.fileName} not found in Dropbox — check the path in Settings` });
     return r;
   }
   if (item.type === "moment") {
