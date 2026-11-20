@@ -33,6 +33,13 @@ const icon = {
   lib: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
   tl: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 6h8M7 12h10M5 18h14"/></svg>',
 };
+/** Machines with "online" meaning the helper checked in within the last 2 minutes (it does so every 30 s). */
+function machinesNow() {
+  const ms = store.get("machines") || {};
+  const out = {};
+  for (const [id, m] of Object.entries(ms)) out[id] = { ...m, online: !!m.online && (store.mode === "local" || Date.now() - (m.lastSeen || 0) < 120000) };
+  return out;
+}
 const settings = () => ({ ...DEFAULT_SETTINGS, ...(store.get("settings") || {}) });
 const me = () => LS.get("name", "");
 const ago = (t) => {
@@ -119,7 +126,7 @@ function viewHome() {
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = ws.filter((w) => (w.sun || w.sat) >= today);
   const past = ws.filter((w) => (w.sun || w.sat) < today).reverse().slice(0, 4);
-  const machines = Object.entries(store.get("machines") || {});
+  const machines = Object.entriesmachinesNow();
   const sync = store.get("sync") || {};
   const card = (w, i) => {
     const B = buildWeekend(w, ctx());
@@ -212,7 +219,7 @@ function viewWeekend(wid) {
 
 function buildLine(w) {
   const b = w.build;
-  const m = (store.get("machines") || {})[b.machine];
+  const m = machinesNow()[b.machine];
   const label = { queued: "Build queued", building: "Building", built: "Built", finished: "Finished", uploaded: "Finished · WORSHIP bounce in Planning Center", failed: "Build failed" }[b.status] || b.status;
   return `<div class="banner" style="background:var(--glass);border:1px solid var(--line)"><span class="dot ${b.status === "failed" ? "" : "on"}" style="${b.status === "failed" ? "background:var(--err)" : ""}"></span>
     <span>${h(label)} by <b>${h(b.by || "?")}</b> on ${h(m?.name || b.machine || "?")} · ${ago(b.at)}</span>
@@ -585,7 +592,7 @@ function viewBuild(wid) {
   const w = weekends()[wid];
   if (!w) return viewHome();
   const B = buildWeekend(w, ctx());
-  const machines = Object.entries(store.get("machines") || {}).filter(([, m]) => m.kind !== "booth");
+  const machines = Object.entriesmachinesNow().filter(([, m]) => m.kind !== "booth");
   const mine = machines.find(([, m]) => m.owner && m.owner.toLowerCase() === (me() || "").toLowerCase());
   const pick = ui.buildMachine && machines.some(([id]) => id === ui.buildMachine) ? ui.buildMachine : (mine || machines.find(([, m]) => m.online) || machines[0] || [])[0];
   const job = w.build?.jobId ? (store.get("jobs") || {})[w.build.jobId] : null;
@@ -597,7 +604,7 @@ function viewBuild(wid) {
   if (job) {
     const doneN = BUILD_STEPS.findIndex(([k]) => k === job.step);
     const pctDone = job.status === "done" ? 100 : Math.max(0, Math.round((doneN / BUILD_STEPS.length) * 100));
-    jobHtml = `<div class="glass card"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><span class="label">${job.status === "done" ? "Built" : job.status === "queued" ? "Waiting for" : "Building on"} ${h((store.get("machines") || {})[job.machine]?.name || job.machine)}</span><span class="small muted">Started by ${h(job.by)} · ${ago(job.at)}</span></div>
+    jobHtml = `<div class="glass card"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><span class="label">${job.status === "done" ? "Built" : job.status === "queued" ? "Waiting for" : "Building on"} ${h(machinesNow()[job.machine]?.name || job.machine)}</span><span class="small muted">Started by ${h(job.by)} · ${ago(job.at)}</span></div>
       <div class="bar"><div style="width:${pctDone}%"></div></div>
       <div class="steps">${BUILD_STEPS.map(([k, label], i) => {
         const st = job.status === "done" || i < doneN ? "done" : i === doneN ? (job.status === "failed" ? "fail" : "active") : "todo";
@@ -614,13 +621,13 @@ function viewBuild(wid) {
     ${jobHtml}
     <div class="field"><span class="label">Build on</span>${machines.map(([id, m]) => `<button class="pick ${id === pick ? "on" : ""}" data-act="pick-machine" data-v="${h(id)}" aria-pressed="${id === pick}">
       <span><span style="font-size:15px;font-weight:600;display:block">${h(m.name)}</span><span class="small muted">${m.online ? (m.proTools ? "Online · Pro Tools open" : "Online · open Pro Tools to build") : "Offline · build waits until it's on"}</span></span><span class="dot ${m.online ? "on" : "off"}" style="width:10px;height:10px"></span></button>`).join("") || `<span class="muted small">No computers registered yet.</span>`}</div>
-    ${existing ? `<div class="flag warn">Already ${h(w.build.status)} by ${h(w.build.by)} on ${h((store.get("machines") || {})[w.build.machine]?.name || w.build.machine)} (${ago(w.build.at)}). Rebuilding makes a new session; it never overwrites theirs, and the lighting director's SMPTE/video edits stay in the earlier copy.</div>` : ""}
+    ${existing ? `<div class="flag warn">Already ${h(w.build.status)} by ${h(w.build.by)} on ${h(machinesNow()[w.build.machine]?.name || w.build.machine)} (${ago(w.build.at)}). Rebuilding makes a new session; it never overwrites theirs, and the lighting director's SMPTE/video edits stay in the earlier copy.</div>` : ""}
     ${errors.length ? `<div class="flags">${errors.map((f) => `<div class="flag error">${h(f.title)}: ${h(f.text)}</div>`).join("")}</div>` : ""}
     ${warns.length ? `<details class="more"><summary>${warns.length} thing${warns.length > 1 ? "s" : ""} to check first</summary><div class="flags" style="margin-top:8px">${warns.map((f) => `<div class="flag warn">${h(f.title)}: ${h(f.text)}</div>`).join("")}</div></details>` : ""}
     <div class="glass card" style="gap:6px"><span class="label">What gets built</span>
       <span class="small">${B.resolved.filter((r) => r.type !== "countdown" && r.type !== "beginsNow").map((r) => h(r.title || "Walk-in") + (r.shift && !r.pnt ? ` (${fmtShift(r.shift)})` : "")).join(" · ")}</span>
       <span class="small muted">${B.tl.tempoMap.length} tempo events · ${B.tl.markers.length} markers · ends ${fmt(B.tl.end)} · ${B.resolved.filter((r) => r.shift && !r.pnt).length} songs shifted automatically</span></div>
-    <button class="btn primary" style="min-height:54px;font-size:16px" data-act="start-build" data-w="${h(wid)}" data-m="${h(pick || "")}" ${errors.length || !pick ? "disabled" : ""}>${existing ? "Rebuild" : "Build"} on ${h((store.get("machines") || {})[pick]?.name || "…")}</button>
+    <button class="btn primary" style="min-height:54px;font-size:16px" data-act="start-build" data-w="${h(wid)}" data-m="${h(pick || "")}" ${errors.length || !pick ? "disabled" : ""}>${existing ? "Rebuild" : "Build"} on ${h(machinesNow()[pick]?.name || "…")}</button>
     <span class="small muted" style="text-align:center">You can close this page — the planner shows progress when you come back.</span>
   </div>`;
 }
@@ -651,7 +658,7 @@ async function startBuild(wid, machineId) {
 
 /** Test mode only: pretend the helper is building so the progress screen can be tried. */
 function simulateJob(wid, jobId) {
-  const m = (store.get("machines") || {})[store.get(`jobs/${jobId}/machine`)];
+  const m = machinesNow()[store.get(`jobs/${jobId}/machine`)];
   if (!m?.online || !m.proTools) return;
   let i = 0;
   const tick = async () => {
