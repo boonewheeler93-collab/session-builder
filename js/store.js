@@ -71,10 +71,21 @@ export const store = {
     const fb = window.firebase;
     if (!fb.apps.length) fb.initializeApp(FIREBASE_CONFIG);
     db = fb.database();
+    // Signed in but refused (e.g. the database rule isn't there yet): keep retrying every 30 s so the
+    // page connects on its own once access is granted, without a reload.
+    let retryT = null;
+    const tryConnect = () => {
+      clearTimeout(retryT);
+      if (!authUser) return;
+      connect().then(() => onAuthChange?.(true), (e) => {
+        onAuthChange?.(false, e);
+        if (/permission/i.test(e?.message || "")) retryT = setTimeout(tryConnect, 30000);
+      });
+    };
     fb.auth().onAuthStateChanged((u) => {
       authUser = u;
-      if (u) connect().then(() => onAuthChange?.(true), (e) => onAuthChange?.(false, e));
-      else onAuthChange?.(false);
+      if (u) tryConnect();
+      else { clearTimeout(retryT); onAuthChange?.(false); }
     });
   },
   async signIn(password) {
