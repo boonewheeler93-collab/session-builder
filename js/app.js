@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS, ROOT } from "./config.js";
 import { KEYS, keyName, fmtShift, norm, pickVersion, splitTitleHints } from "./music.js";
 import { buildWeekend, metaKey, sessionName, weekendTitle, libSong } from "./model.js";
 import { fmt } from "./timing.js";
+import { planSend } from "./send.js";
 
 const $app = document.getElementById("app");
 const LS = {
@@ -74,6 +75,7 @@ function render() {
   if (!me() && parts[0] !== "settings") ui.modal = ui.modal || { type: "name" };
   if (parts[0] === "w" && parts[1] && parts[2] === "bank") html = viewBank(parts[1]);
   else if (parts[0] === "w" && parts[1] && parts[2] === "build") html = viewBuild(parts[1]);
+  else if (parts[0] === "w" && parts[1] && parts[2] === "send") html = viewSend(parts[1]);
   else if (parts[0] === "w" && parts[1]) html = viewWeekend(parts[1]);
   else if (parts[0] === "bank") html = viewBank(null);
   else if (parts[0] === "settings") html = viewSettings();
@@ -178,9 +180,11 @@ function viewWeekend(wid) {
         <span class="chip num">Set ends ≈ ${fmt(B.tl.bounce?.end)}</span>
         ${B.tl.bounce ? `<span class="chip num hide-phone">WORSHIP ${fmt(B.tl.bounce.end - B.tl.bounce.start)}</span>` : ""}
         ${warns ? `<span class="chip warn">${warns} to check</span>` : `<span class="chip ok">No flags</span>`}
+        ${B.edits.length ? `<span class="chip">${B.edits.length} arrangement edit${B.edits.length > 1 ? "s" : ""}</span>` : ""}
         ${B.steps.length ? `<span class="chip">${B.steps.length} manual step${B.steps.length > 1 ? "s" : ""}</span>` : ""}
         <button class="btn small ${tlOpen ? "on" : ""}" data-act="toggle-tl" aria-pressed="${tlOpen}">${icon.tl} Timeline</button>
         <a class="btn" href="#/w/${h(wid)}/bank">+ Add song</a>
+        ${sendButton(wid, w, B)}
         <a class="btn primary" href="#/w/${h(wid)}/build">${st.text.startsWith("Built") || st.text === "Uploaded" ? "Rebuild" : "Build"}</a>
       </div>
     </div>
@@ -318,7 +322,9 @@ function detailHtml(wid, w, B, r) {
   const notes = (it.notes || []).length ? `<div class="glass card" style="gap:8px"><span class="label">From Planning Center</span>
     ${it.pcoTitle ? `<span class="small muted">${h(it.pcoTitle)}${it.planLengthSec ? " · " + fmt(it.planLengthSec) + " in the plan" : ""}</span>` : ""}
     <div class="notes">${it.notes.map((n) => `<span>${h(n)}</span>`).join("")}</div></div>` : "";
-  const steps = r.steps.length ? `<div class="glass card" style="gap:10px"><span class="label">Manual steps after the build</span>${r.steps.map((s) => `<span class="check"><i></i>${h(s)}</span>`).join("")}</div>` : "";
+  const steps = (r.edits.length ? `<div class="glass card" style="gap:10px"><span class="label">Arrangement edits from the plan</span>${r.edits.map((s) => `<span class="check"><i></i>${h(s)}</span>`).join("")}
+      <span class="small muted">Song sections will apply these automatically for you to review. Until that's built, do them by hand after the build.</span></div>` : "") +
+    (r.steps.length ? `<div class="glass card" style="gap:10px"><span class="label">Manual steps after the build</span>${r.steps.map((s) => `<span class="check"><i></i>${h(s)}</span>`).join("")}</div>` : "");
   const canMove = r.type === "song" || r.type === "moment";
 
   return `${nav}<div class="glass card">
@@ -345,7 +351,7 @@ function sessionCard(B) {
         <div class="kv num">${tl.markers.map((m) => `<span class="k">${fmt(m.at, 1)}</span><span style="grid-column:span 2">${h(m.name)}</span>`).join("")}</div></div>
     </div>
     ${tl.bounce ? `<span class="small muted">WORSHIP bounce ${fmt(tl.bounce.start, 1)} → ${fmt(tl.bounce.end, 1)} (${fmt(tl.bounce.end - tl.bounce.start)}) · VIDEO bounce 0:00 → ${fmt(tl.end, 1)}</span>` : ""}
-    ${B.steps.length ? `<details class="more"><summary>All manual steps (${B.steps.length})</summary><div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">${B.steps.map((s) => `<span class="check"><i></i>${h(s.title)} · ${h(s.text)}</span>`).join("")}</div></details>` : ""}
+    ${B.handWork.length ? `<details class="more"><summary>After the build, by hand (${B.handWork.length})</summary><div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">${B.handWork.map((s) => `<span class="check"><i></i>${h(s.title)} · ${h(s.text)}</span>`).join("")}</div></details>` : ""}
     ${tl.warnings.length ? `<details class="more"><summary>Transitions to look at (${tl.warnings.length})</summary><div class="flags" style="margin-top:8px">${tl.warnings.map((x) => `<div class="flag info">${h(x.text)}</div>`).join("")}</div></details>` : ""}
   </div>`;
 }
@@ -485,6 +491,76 @@ async function bankAdd(wid, path, tab, forId) {
   toast(`Added ${s.title}`);
 }
 
+// ----- send to Planning Center -----
+const SEND_LABEL = { queued: "Queued", sending: "Sending…", sent: "Sent", failed: "Send failed", waiting: "Needs your answer" };
+function sendButton(wid, w, B) {
+  const p = planSend(w, B);
+  const s = w.send;
+  if (s && ["queued", "sending", "waiting", "failed"].includes(s.status)) return `<a class="btn" href="#/w/${h(wid)}/send">PCO: ${h(SEND_LABEL[s.status])}</a>`;
+  if (!p.changes.length) return s?.status === "sent" ? `<span class="chip ok">Sent to PCO</span>` : "";
+  return `<a class="btn" href="#/w/${h(wid)}/send">Send to Planning Center (${p.changes.length})</a>`;
+}
+
+function viewSend(wid) {
+  const w = weekends()[wid];
+  if (!w) return viewHome();
+  const B = buildWeekend(w, ctx());
+  const p = planSend(w, B);
+  const s = w.send;
+  const req = s?.id ? (store.get("sends") || {})[s.id] : null;
+  const needConfirm = p.changes.some((c) => c.confirm);
+  const status = s ? `<div class="glass card" style="gap:8px"><span class="label">Last request</span>
+      <span><b>${h(SEND_LABEL[s.status] || s.status)}</b> · sent by ${h(s.by || "?")} ${ago(s.at)}${s.status === "sent" && s.sentAt ? " · written to the plan " + ago(s.sentAt) : ""}</span>
+      ${req?.message ? `<span class="small">${h(req.message)}</span>` : ""}
+      ${s.status === "queued" ? `<span class="small muted">The pco-tools job checks for requests every ~5 minutes.</span>` : ""}
+      ${s.status === "sent" ? `<span class="small muted">Planning Center is the source of truth again; later edits there sync back here.</span>` : ""}</div>` : "";
+  return `<div class="wrap" style="max-width:720px">
+    <div class="top"><div class="row" style="gap:12px"><a class="iconbtn" href="#/w/${h(wid)}" aria-label="Back to the weekend">${icon.back}</a>
+      <div><span class="label">Send to Planning Center · ${h(w.serviceType || "Northland | Weekend")}</span><h1 class="num">${h(weekendTitle(w))}</h1></div></div></div>
+    ${modeBanner()}
+    ${status}
+    ${p.blockers.length ? `<div class="flags">${p.blockers.map((b) => `<div class="flag error">${h(b)}</div>`).join("")}</div>` : ""}
+    <div class="glass card" style="gap:10px"><span class="label">What will change (${p.changes.length})</span>
+      ${p.changes.length ? p.changes.map((c) => `<span class="check"><i style="border-color:var(--accent)"></i>${h(c.text)}${c.arrangement && c.arrangement !== "Default" ? ` <span class="tag">${h(c.arrangement)}</span>` : ""}</span>`).join("") : `<span class="muted">Nothing to send — the plan already matches.</span>`}
+    </div>
+    <div class="glass card" style="gap:8px"><span class="label">Stays as it is</span>
+      <span class="small muted">Template items and everything in PRE-EXPERIENCE, STAGE TIME, MESSAGE and CLOSE are never touched, and item notes (who leads, cues) are never overwritten.</span>
+      ${p.keep.map((k) => `<span class="small">${h(k.title)} <span class="muted">· ${h(k.why)}</span></span>`).join("")}
+    </div>
+    ${p.warnings.length ? `<div class="flags">${p.warnings.map((x) => `<div class="flag warn">${h(x)}</div>`).join("")}</div>` : ""}
+    ${needConfirm ? `<label class="switch"><input type="checkbox" id="sendConfirm"> Yes, replace the walk-in title that's already in the plan</label>` : ""}
+    <button class="btn primary" style="min-height:54px;font-size:16px" data-act="send-pco" data-w="${h(wid)}" ${p.blockers.length || !p.changes.length ? "disabled" : ""}>Send ${p.changes.length} change${p.changes.length === 1 ? "" : "s"} to Planning Center</button>
+    <span class="small muted" style="text-align:center">The planner never writes to Planning Center itself: the pco-tools job does it with Boone's token and reports back here.</span>
+  </div>`;
+}
+
+async function sendToPco(wid) {
+  const w = weekends()[wid];
+  const B = buildWeekend(w, ctx());
+  const p = planSend(w, B);
+  if (p.blockers.length || !p.changes.length) return;
+  if (p.changes.some((c) => c.confirm) && !document.getElementById("sendConfirm")?.checked) { toast("Tick the box to allow replacing the walk-in title"); return; }
+  const at = Date.now();
+  const req = clean({ weekendId: wid, pcoPlanId: w.pcoPlanId || null, serviceType: w.serviceType || null, by: me() || "?", at, status: "queued",
+    changes: JSON.parse(JSON.stringify(p.changes.map(({ text, ...c }) => clean({ ...c, summary: text })))) });
+  const id = await store.push("sends", req);
+  await store.update(`weekends/${wid}`, { send: { id, status: "queued", by: req.by, at } });
+  toast("Queued for Planning Center");
+  if (store.mode === "local") {
+    // Test mode: pretend the pco-tools job picked it up.
+    setTimeout(async () => {
+      await store.update(`sends/${id}`, { status: "sent", message: "Test mode: nothing was written to Planning Center." });
+      await store.update(`weekends/${wid}/send`, { status: "sent", sentAt: Date.now() });
+      const items = (weekends()[wid].items || []).map((it) => {
+        const c = p.changes.find((x) => (x.op === "add" && x.title === it.title && it.addedHere) || (x.op === "rename" && it.type === "walkin"));
+        if (!c) return it;
+        return clean({ ...it, addedHere: undefined, placeholder: undefined, pcoTitle: c.op === "rename" ? c.title : it.title });
+      });
+      await setItems(wid, items);
+    }, 2500);
+  }
+}
+
 // ----- build -----
 const BUILD_STEPS = [
   ["copy", "Copy stems from Dropbox"],
@@ -519,7 +595,7 @@ function viewBuild(wid) {
         return `<div class="stp"><span class="ic ${st}">${st === "done" ? "✓" : st === "fail" ? "!" : ""}</span><span><span style="font-size:15px;${st === "todo" ? "color:var(--ink-3)" : "font-weight:500"}">${h(label)}</span>${job.detail && i === doneN ? `<br><span class="small muted">${h(job.detail)}</span>` : ""}</span></div>`;
       }).join("")}</div>
       ${job.status === "queued" ? `<p class="small muted" style="margin:0">Waiting for the helper to pick it up. Pro Tools must be open on that computer.</p>` : ""}
-      ${job.status === "done" ? `<p class="small" style="margin:0">Saved in TRACKS / ${h(name)}. ${B.steps.length ? `Next: ${B.steps.length} manual step${B.steps.length > 1 ? "s" : ""}, then Finish.` : "No manual steps — ready to Finish."}</p>` : ""}
+      ${job.status === "done" ? `<p class="small" style="margin:0">Saved in TRACKS / ${h(name)}. ${B.handWork.length ? `Next: ${B.handWork.length} thing${B.handWork.length > 1 ? "s" : ""} to do by hand, then Finish.` : "Nothing to do by hand — ready to Finish."}</p>` : ""}
     </div>`;
   }
   return `<div class="wrap" style="max-width:640px">
@@ -648,8 +724,10 @@ document.addEventListener("click", async (e) => {
     await setItems(wid, items);
   } else if (act === "remove") {
     const it = weekends()[wid].items.find((x) => x.id === id);
-    if (!confirm(`Remove ${it.title || "this item"} from the set?`)) return;
+    const inPlan = it.pcoTitle && !it.addedHere;
+    if (!confirm(`Remove ${it.title || "this item"} from the set?${inPlan ? " It stays in Planning Center; the planner never deletes plan items." : ""}`)) return;
     await setItems(wid, weekends()[wid].items.filter((x) => x.id !== id));
+    if (inPlan) await store.update(`weekends/${wid}`, { removedFromPlan: [...(weekends()[wid].removedFromPlan || []), it.pcoTitle] });
   } else if (act === "add-moment") {
     const items = [...weekends()[wid].items];
     const selIdx = items.findIndex((x) => x.id === ui.sel[wid]);
@@ -663,6 +741,7 @@ document.addEventListener("click", async (e) => {
   else if (act === "bank-add") await bankAdd(wid, el.dataset.path, el.dataset.tab, el.dataset.for);
   else if (act === "pick-machine") { ui.buildMachine = v; render(); }
   else if (act === "start-build") await startBuild(wid, el.dataset.m);
+  else if (act === "send-pco") await sendToPco(wid);
   else if (act === "signout") { await store.signOut(); store.initLocal(DEMO); }
   else if (act === "reset-demo") { if (confirm("Reset the sample weekends in this browser?")) store.resetLocal(DEMO); }
 });

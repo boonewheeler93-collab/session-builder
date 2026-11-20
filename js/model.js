@@ -40,7 +40,7 @@ const isFormNote = (n) =>
 /** Resolve one item. Returns an object with everything the UI shows. */
 export function resolveItem(item, ctx, index, all) {
   const { lib, meta, settings } = ctx;
-  const r = { item, flags: [], steps: [], id: item.id, type: item.type, title: item.title };
+  const r = { item, flags: [], steps: [], edits: [], id: item.id, type: item.type, title: item.title };
   const S = settings;
   if (item.type === "countdown" || item.type === "beginsNow") {
     const cd = item.type === "countdown";
@@ -123,7 +123,9 @@ export function resolveItem(item, ctx, index, all) {
       if (Math.abs(r.shift) >= 3) r.flags.push({ level: "info", text: `Shift of ${Math.abs(r.shift)} semitones — listen to the A/B preview after the build` });
     }
   }
-  for (const n of item.notes || []) if (isFormNote(n)) r.steps.push("Edit form: " + n.replace(/^\s*\*\s*/, ""));
+  // Arrangement edits from Planning Center notes (§2 song sections will apply these automatically and
+  // Boone reviews them; until that feature exists they are done by hand after the build).
+  for (const n of item.notes || []) if (isFormNote(n)) r.edits.push(n.replace(/^\s*\*\s*/, ""));
   if (song.collection === "Stem Archive") r.flags.push({ level: "info", text: "Stem Archive — older file names" });
   return r;
 }
@@ -140,8 +142,11 @@ export function buildWeekend(weekend, ctx) {
   tl.parts.forEach((p, i) => Object.assign(resolved[i], { t: p }));
   const songs = resolved.filter((r) => r.type === "song");
   const steps = resolved.flatMap((r) => r.steps.map((s) => ({ id: r.id, title: r.title, text: s })));
+  const edits = resolved.flatMap((r) => r.edits.map((s) => ({ id: r.id, title: r.title, text: s })));
   const flags = resolved.flatMap((r) => r.flags.map((f) => ({ ...f, id: r.id, title: r.title })));
-  return { items, resolved, tl, songs, steps, flags };
+  // Work left for a person after the build: manual steps plus edits song sections can't apply yet.
+  const handWork = [...edits.map((e) => ({ ...e, text: "Arrangement: " + e.text })), ...steps];
+  return { items, resolved, tl, songs, steps, edits, handWork, flags };
 }
 
 /** Is this PCO item an in-set moment (pastoral moment etc.)? */
