@@ -283,10 +283,10 @@ function detailHtml(wid, w, B, r) {
     const vs = r.song?.versions || [];
     const keyOpts = (cur) => `<option value="">—</option>` + KEYS.flatMap((k) => [k, k + "m"]).map((k) => `<option ${keyName(cur) === k ? "selected" : ""}>${k}</option>`).join("");
     body += `<div class="field"><span>Stem folder</span><div class="row" style="flex-wrap:wrap">
-      <span class="grow small" style="overflow-wrap:anywhere">${r.song ? h((r.type === "walkin" ? "+ WALK-IN/" : "+ WORSHIP/") + r.song.path.replace(/^\+ WALK-IN\//, "")) : '<span style="color:var(--err)">none</span>'}${it.matchedBy === "auto" || (!it.libPath && r.song) ? ' <span class="tag">matched by title</span>' : ""}</span>
+      <span class="grow small" style="overflow-wrap:anywhere">${r.song ? h(r.version?.base === "dropbox" ? "Boone Wheeler/" + r.version.path : (r.type === "walkin" ? "+ WALK-IN/" : "+ WORSHIP/") + r.song.path.replace(/^\+ WALK-IN\//, "")) : '<span style="color:var(--err)">none</span>'}${it.matchedBy === "auto" || (!it.libPath && r.song) ? ' <span class="tag">matched by title</span>' : ""}</span>
       <a class="btn small" href="#/w/${h(wid)}/bank?for=${h(r.id)}${r.type === "walkin" ? "&tab=walkin" : ""}">Change</a></div></div>`;
     body += `<div class="fields">
-      ${vs.length > 1 ? `<label class="field"><span>Version</span><select class="input" data-ch="version" data-w="${h(wid)}" data-id="${h(r.id)}">${vs.map((v) => `<option value="${h(v.name)}" ${r.version?.name === v.name ? "selected" : ""}>${h(v.name)}${v.kind === "key" ? " (key folder)" : ""} · ${fmt(v.lengthSec)}</option>`).join("")}</select></label>` : ""}
+      ${vs.length > 1 ? `<label class="field"><span>Version</span><select class="input" data-ch="version" data-w="${h(wid)}" data-id="${h(r.id)}">${vs.map((v) => `<option value="${h(v.name)}" ${r.version?.name === v.name ? "selected" : ""}>${h(v.name)}${v.kind === "key" ? " (key folder)" : ""}${v.base === "dropbox" ? " · your Dropbox" : ""} · ${fmt(v.lengthSec)}</option>`).join("")}</select></label>` : ""}
       ${r.type === "song" ? `<label class="field"><span>Plan key</span><select class="input" data-ch="planKey" data-w="${h(wid)}" data-id="${h(r.id)}">${keyOpts(it.planKey)}</select></label>
       <label class="field"><span>Stem key · ${h(r.stemKey?.source || "")}</span><select class="input" data-ch="stemKey" data-w="${h(wid)}" data-id="${h(r.id)}">${keyOpts(r.stemKey?.key)}</select></label>` : ""}
       <label class="field"><span>BPM${r.bpmNeedsConfirm ? " — confirm" : ""}</span><input class="input num" inputmode="decimal" value="${h(r.bpm)}" data-ch="bpm" data-w="${h(wid)}" data-id="${h(r.id)}" aria-label="BPM"></label>
@@ -788,7 +788,10 @@ document.addEventListener("change", async (e) => {
   const it = w.items.find((x) => x.id === id);
   const B = buildWeekend(w, ctx());
   const r = B.resolved.find((x) => x.id === id);
-  if (ch === "version") await patchItem(wid, id, { version: el.value, libPath: r.song?.path, lengthSec: undefined });
+  if (ch === "version") {
+    await patchItem(wid, id, { version: el.value, libPath: r.song?.path, lengthSec: undefined });
+    if (r.song) await store.update(`songMeta/${metaKey(r.song.path, "*")}`, { preferredVersion: el.value, preferredBy: me() || null, preferredAt: Date.now() });
+  }
   else if (ch === "planKey") await patchItem(wid, id, { planKey: el.value || undefined });
   else if (ch === "stemKey") {
     if (!r.song) return;

@@ -18,7 +18,7 @@ export function libSong(lib, item) {
 }
 
 /** Find the library song for an item that has none yet (from its PCO title). */
-export function autoMatch(lib, item) {
+export function autoMatch(lib, item, meta = {}) {
   if (item.libPath || !lib) return item;
   if (item.type === "walkin") {
     const w = findWalkin(lib, item.title + (item.artist ? " " + item.artist : "")) || findWalkin(lib, item.title);
@@ -28,7 +28,7 @@ export function autoMatch(lib, item) {
     const s = findWorshipSong(lib, item.pcoTitle || item.title);
     if (!s) return item;
     const { hints } = splitTitleHints(item.pcoTitle || item.title);
-    const v = pickVersion(s, { hints, planKey: item.planKey, arrangement: item.pcoArrangement?.name });
+    const v = pickVersion(s, { hints, planKey: item.planKey, arrangement: item.pcoArrangement?.name, preferred: meta[metaKey(s.path, "*")]?.preferredVersion });
     return { ...item, libPath: s.path, version: item.version || v?.name, matchedBy: "auto" };
   }
   return item;
@@ -86,7 +86,7 @@ export function resolveItem(item, ctx, index, all) {
     Object.assign(r, { bpm: item.bpm || 120, meter: item.meter || [4, 4], lengthSec: item.lengthSec || item.planLengthSec || 240, stub: true });
     return r;
   }
-  const version = song.versions.find((v) => v.name === item.version) || pickVersion(song, { planKey: item.planKey, hints: splitTitleHints(item.pcoTitle || "").hints, arrangement: item.pcoArrangement?.name });
+  const version = song.versions.find((v) => v.name === item.version) || pickVersion(song, { planKey: item.planKey, hints: splitTitleHints(item.pcoTitle || "").hints, arrangement: item.pcoArrangement?.name, preferred: meta[metaKey(song.path, "*")]?.preferredVersion });
   r.version = version;
   const m = meta[metaKey(song.path, version?.name)] || {};
   r.meta = m;
@@ -142,7 +142,7 @@ export function resolveItem(item, ctx, index, all) {
 
 /** Resolve all items, then lay out the timeline. */
 export function buildWeekend(weekend, ctx) {
-  const items = (weekend.items || []).map((it) => autoMatch(ctx.lib, it));
+  const items = (weekend.items || []).map((it) => autoMatch(ctx.lib, it, ctx.meta));
   const resolved = items.map((it, i) => resolveItem(it, ctx, i, items));
   const parts = resolved.map((r) => ({
     id: r.id, type: r.type, title: r.title, bpm: r.bpm, meter: r.meter, lengthSec: r.lengthSec,

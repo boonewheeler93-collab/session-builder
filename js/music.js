@@ -151,7 +151,7 @@ export function findWalkin(lib, name) {
 }
 
 /** Pick a version: title hints first, then the key folder nearest the plan key. */
-export function pickVersion(song, { hints = [], planKey, arrangement } = {}) {
+export function pickVersion(song, { hints = [], planKey, arrangement, preferred } = {}) {
   const vs = song?.versions || [];
   if (!vs.length) return null;
   // Planning Center arrangement name vs version folder: "Short To 5:30m" ~ "I Know A Name (Short To 530m)"
@@ -160,6 +160,8 @@ export function pickVersion(song, { hints = [], planKey, arrangement } = {}) {
     const v = vs.find((v) => compact(v.name).includes(compact(arrangement)));
     if (v) return v;
   }
+  // The version picked last time for this song (saved when someone changes it in the planner)
+  if (preferred && !hints.length) { const v = vs.find((v) => v.name === preferred); if (v) return v; }
   const want = hints.join(" ");
   if (/short/.test(want)) { const v = vs.find((v) => /short/i.test(v.name)); if (v) return v; }
   if (/long/.test(want)) { const v = vs.find((v) => /long/i.test(v.name)); if (v) return v; }
