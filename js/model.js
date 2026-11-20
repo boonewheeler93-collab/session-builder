@@ -81,7 +81,8 @@ export function resolveItem(item, ctx, index, all) {
   r.song = song;
   r.lane = "music";
   if (!song) {
-    r.flags.push({ level: "error", text: lib ? "No stem folder matched — pick one in the song bank" : "Library not loaded" });
+    if (item.type === "walkin" && !item.title) r.flags.push({ level: "warn", text: "No walk-in picked yet — choose one in the song bank" });
+    else r.flags.push({ level: "error", text: lib ? "No stem folder matched — pick one in the song bank" : "Library not loaded" });
     Object.assign(r, { bpm: item.bpm || 120, meter: item.meter || [4, 4], lengthSec: item.lengthSec || item.planLengthSec || 240, stub: true });
     return r;
   }
